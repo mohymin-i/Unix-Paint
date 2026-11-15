@@ -1,0 +1,17 @@
+/target
+# Microsoft binary and derived RE dumps are not redistributable
+*.exe
+/backup/
+/re/out/
+/re/decomp/
+
+# Temporary files left by interrupted saves
+*.unix-paint-tmp
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+.idea/
+.vscode/
