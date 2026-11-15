@@ -1,0 +1,83 @@
+# Draw with many tools; writes screenshots and the result to target/. Run:
+#   unix-paint --script tests/scripts/tour.txt
+cmd fit
+wait 3
+tool pencil
+drag 20 20 200 60
+color1 #ED1C24
+tool brush:Brush
+size 12
+drag 30 100 300 140 20
+tool brush:Calligraphy45
+color1 #3F48CC
+size 16
+drag 30 170 300 210
+tool brush:Airbrush
+color1 #22B14C
+size 40
+drag 40 250 300 260 30
+tool brush:Oil
+color1 #FF7F27
+size 30
+drag 340 40 620 80 20
+tool brush:Crayon
+color1 #A349A4
+drag 340 110 620 150 20
+tool brush:Marker
+color1 #FFF200
+drag 340 180 620 220 20
+tool brush:NaturalPencil
+color1 #000000
+drag 340 250 620 280 20
+tool brush:Watercolor
+color1 #00A2E8
+size 40
+drag 340 320 620 360 20
+tool shape:Rectangle
+color1 #000000
+color2 #99D9EA
+fill solid
+size 4
+drag 660 30 800 120
+cmd commit
+tool shape:Heart
+color2 #FFAEC9
+drag 820 30 950 140
+cmd commit
+tool shape:FivePointStar
+outline crayon
+fill none
+size 8
+drag 660 160 800 300
+cmd commit
+tool shape:Lightning
+outline solid
+fill solid
+color2 #FFC90E
+size 3
+drag 820 160 940 320
+cmd commit
+tool shape:CloudCallout
+fill none
+drag 60 330 300 470
+cmd commit
+tool text
+cmd textstyle 28 bold
+color1 #880015
+click 660 360
+type Hello, Unix Paint!
+wait 2
+cmd commit
+tool fill
+color1 #B5E61D
+click 700 80
+wait 2
+shot target/ui-tour-1.png
+tool select
+drag 650 20 960 330
+wait 2
+shot target/ui-tour-2.png
+cmd rotate 90
+wait 2
+shot target/ui-tour-3.png
+save target/ui-tour.png
