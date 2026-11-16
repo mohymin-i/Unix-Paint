@@ -213,6 +213,7 @@ fn text_keys(app: &mut PaintApp, ctx: &egui::Context) {
     }
     let events: Vec<egui::Event> = ctx.input(|i| i.events.clone());
     let mut consumed = false;
+    let mut clipboard_error = None;
     for e in events {
         let Some(t) = app.text.as_mut() else { break };
         match e {
@@ -227,8 +228,11 @@ fn text_keys(app: &mut PaintApp, ctx: &egui::Context) {
             }
             egui::Event::Cut => {
                 if let Some(s) = t.selected_text() {
-                    let _ = crate::io::clipboard_set_text(s);
-                    t.backspace();
+                    // Delete the text only once it is on the clipboard, so a failed cut loses nothing.
+                    match crate::io::clipboard_set_text(s) {
+                        Ok(()) => t.backspace(),
+                        Err(err) => clipboard_error = Some(err),
+                    }
                 }
                 consumed = true;
             }
@@ -257,6 +261,9 @@ fn text_keys(app: &mut PaintApp, ctx: &egui::Context) {
             }
             _ => {}
         }
+    }
+    if let Some(err) = clipboard_error {
+        app.error(format!("Couldn't cut to the clipboard.\n{err}"));
     }
     if consumed {
         app.invalidate_all();

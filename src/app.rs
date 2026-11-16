@@ -530,8 +530,10 @@ impl PaintApp {
 
     pub fn copy(&mut self) {
         let img = if let Some(t) = &self.text {
-            if let Some(s) = t.selected_text() {
-                let _ = io::clipboard_set_text(s);
+            if let Some(s) = t.selected_text()
+                && let Err(e) = io::clipboard_set_text(s)
+            {
+                self.error(format!("Couldn't copy to the clipboard.\n{e}"));
             }
             return;
         } else if let Some(s) = &self.selection {
