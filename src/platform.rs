@@ -38,6 +38,20 @@ fn have(cmd: &str) -> bool {
     std::env::split_paths(&paths).any(|dir| dir.join(cmd).is_file())
 }
 
+/// XFCE's `image-style` value for each mode.
+fn xfce_style(mode: WallpaperMode) -> &'static str {
+    match mode {
+        WallpaperMode::Fill => "5",
+        WallpaperMode::Tile => "2",
+        WallpaperMode::Center => "1",
+    }
+}
+
+/// The per-monitor, per-workspace `last-image` properties from `xfconf-query -l`.
+fn xfce_image_props(listing: &str) -> Vec<&str> {
+    listing.lines().map(str::trim).filter(|l| l.ends_with("/last-image")).collect()
+}
+
 pub fn set_wallpaper(p: &Pixmap, mode: WallpaperMode) -> Result<()> {
     // A fresh file name each time so desktops notice the change.
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
@@ -76,16 +90,20 @@ pub fn set_wallpaper(p: &Pixmap, mode: WallpaperMode) -> Result<()> {
         return run("plasma-apply-wallpaperimage", &[&path_s]);
     }
     if desktop.contains("xfce") && have("xfconf-query") {
-        let style = match mode {
-            WallpaperMode::Fill => "5",
-            WallpaperMode::Tile => "2",
-            WallpaperMode::Center => "1",
-        };
-        let out = Command::new("xfconf-query").args(["-c", "xfce4-desktop", "-l"]).output()?;
-        for prop in String::from_utf8_lossy(&out.stdout).lines().filter(|l| l.ends_with("last-image")) {
+        let listing = Command::new("xfconf-query").args(["-c", "xfce4-desktop", "-l"]).output().context("listing XFCE desktop settings")?;
+        if !listing.status.success() {
+            bail!("xfconf-query failed: {}", String::from_utf8_lossy(&listing.stderr).trim());
+        }
+        let names = String::from_utf8_lossy(&listing.stdout).into_owned();
+        let props = xfce_image_props(&names);
+        // Succeeding without touching anything would report a background change that never happened.
+        if props.is_empty() {
+            bail!("XFCE has no desktop image settings to change.");
+        }
+        for prop in props {
             run("xfconf-query", &["-c", "xfce4-desktop", "-p", prop, "-s", &path_s])?;
-            let sp = prop.replace("last-image", "image-style");
-            let _ = run("xfconf-query", &["-c", "xfce4-desktop", "-p", &sp, "-s", style]);
+            let style_prop = prop.replace("last-image", "image-style");
+            run("xfconf-query", &["-c", "xfce4-desktop", "-p", &style_prop, "-s", xfce_style(mode)])?;
         }
         return Ok(());
     }
@@ -97,8 +115,9 @@ pub fn set_wallpaper(p: &Pixmap, mode: WallpaperMode) -> Result<()> {
             WallpaperMode::Center => "centered",
         };
         run("gsettings", &["set", "org.gnome.desktop.background", "picture-uri", &uri])?;
+        // The dark-style key only exists on GNOME 42 and later, so its absence is fine.
         let _ = run("gsettings", &["set", "org.gnome.desktop.background", "picture-uri-dark", &uri]);
-        let _ = run("gsettings", &["set", "org.gnome.desktop.background", "picture-options", opt]);
+        run("gsettings", &["set", "org.gnome.desktop.background", "picture-options", opt])?;
         return Ok(());
     }
     if have("feh") {
@@ -165,4 +184,37 @@ pub fn print(p: &Pixmap, title: &str, dpi: f32, o: &PrintOptions) -> Result<()> 
     args.push(path.to_string_lossy().into_owned());
     let refs: Vec<&str> = args.iter().map(String::as_str).collect();
     run("lp", &refs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn xfce_props_pick_only_last_image_entries() {
+        let listing = "/backdrop/screen0/monitorDP-1/workspace0/last-image\n\
+                       /backdrop/screen0/monitorDP-1/workspace0/image-style\n\
+                       /backdrop/screen0/monitorHDMI-1/workspace0/last-image\n\
+                       /backdrop/screen0/monitorDP-1/workspace0/color-style\n";
+        assert_eq!(
+            xfce_image_props(listing),
+            vec![
+                "/backdrop/screen0/monitorDP-1/workspace0/last-image",
+                "/backdrop/screen0/monitorHDMI-1/workspace0/last-image",
+            ]
+        );
+    }
+
+    #[test]
+    fn xfce_props_empty_when_no_desktop_settings() {
+        assert!(xfce_image_props("").is_empty());
+        assert!(xfce_image_props("/general/SaveOnExit\n").is_empty());
+    }
+
+    #[test]
+    fn xfce_style_values_match_modes() {
+        assert_eq!(xfce_style(WallpaperMode::Fill), "5");
+        assert_eq!(xfce_style(WallpaperMode::Tile), "2");
+        assert_eq!(xfce_style(WallpaperMode::Center), "1");
+    }
 }
